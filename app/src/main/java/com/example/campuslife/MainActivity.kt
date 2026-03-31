@@ -2,6 +2,7 @@ package com.example.campuslife
 
 import android.app.Activity
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
@@ -9,9 +10,12 @@ import android.view.animation.OvershootInterpolator
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.campuslife.adapters.TaskAdapter
@@ -20,6 +24,7 @@ import com.example.campuslife.adapters.EventAdapter
 import com.example.campuslife.model.Task
 import com.example.campuslife.model.Note
 import com.example.campuslife.model.Event
+import com.google.android.material.navigation.NavigationView
 import java.util.*
 import kotlin.math.cos
 import kotlin.math.sin
@@ -28,6 +33,10 @@ class MainActivity : AppCompatActivity(),
     TaskAdapter.OnTaskClickListener,
     NoteAdapter.OnNoteClickListener,
     EventAdapter.OnEventClickListener {
+
+    private lateinit var drawerLayout: DrawerLayout
+    private lateinit var navigationView: NavigationView
+    private lateinit var btnMenu: ImageView
 
     private lateinit var btnAdd: ImageView
     private lateinit var btnTaskWrapper: ConstraintLayout
@@ -64,14 +73,18 @@ class MainActivity : AppCompatActivity(),
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        NotificationHelper.createNotificationChannel(this)
 
-        // Init UI
+        drawerLayout = findViewById(R.id.drawerLayout)
+        navigationView = findViewById(R.id.navigationView)
+        btnMenu = findViewById(R.id.btnMenu)
+        navigationView.itemIconTintList = null
+
         tabTasks = findViewById(R.id.tabTasks)
         tabNotes = findViewById(R.id.tabNotes)
         tabEvents = findViewById(R.id.tabEvents)
         txtEmptyPlaceholder = findViewById(R.id.txtEmptyPlaceholder)
 
-        // Init FAB
         btnAdd = findViewById(R.id.btnAdd)
         btnTaskWrapper = findViewById(R.id.btnTaskWrapper)
         btnNoteWrapper = findViewById(R.id.btnNoteWrapper)
@@ -80,7 +93,6 @@ class MainActivity : AppCompatActivity(),
         btnNoteMini = findViewById(R.id.btnAddNoteMini)
         btnEventMini = findViewById(R.id.btnAddEventMini)
 
-        // Init RecyclerViews
         rvMainToday = findViewById(R.id.recyclerViewMain)
         rvTasksTab = findViewById(R.id.recyclerViewTasksTab)
         rvNotesTab = findViewById(R.id.recyclerViewNotesTab)
@@ -91,19 +103,44 @@ class MainActivity : AppCompatActivity(),
         rvNotesTab.layoutManager = LinearLayoutManager(this)
         rvEventsTab.layoutManager = LinearLayoutManager(this)
 
-        // Init Adapters
-        todayAdapter = TaskAdapter(mutableListOf(), this)
-        taskTabAdapter = TaskAdapter(mutableListOf(), this)
-        notesAdapter = NoteAdapter(mutableListOf(), this)
-        eventAdapter = EventAdapter(mutableListOf(), this)
+        // 🔥 FIX 1: Pointing all adapters to SharedData global lists
+        todayAdapter = TaskAdapter(SharedData.activeTasks, this)
+        taskTabAdapter = TaskAdapter(SharedData.activeTasks, this)
+        notesAdapter = NoteAdapter(SharedData.activeNotes, this)
+        eventAdapter = EventAdapter(SharedData.activeEvents, this)
 
         rvMainToday.adapter = todayAdapter
         rvTasksTab.adapter = taskTabAdapter
         rvNotesTab.adapter = notesAdapter
         rvEventsTab.adapter = eventAdapter
-
         setupListeners()
-        updatePlaceholderVisibility() // Initial check
+        setupDrawer()
+    }
+
+    // 🔥 FIX 2: Refresh lists when returning from TrashActivity
+    override fun onResume() {
+        super.onResume()
+        refreshAllData()
+    }
+
+    private fun refreshAllData() {
+        todayAdapter.notifyDataSetChanged()
+        taskTabAdapter.notifyDataSetChanged()
+        notesAdapter.notifyDataSetChanged()
+        eventAdapter.notifyDataSetChanged()
+        updatePlaceholderVisibility()
+    }
+
+    private fun setupDrawer() {
+        btnMenu.setOnClickListener { drawerLayout.openDrawer(GravityCompat.START) }
+        navigationView.setNavigationItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_trash -> startActivity(Intent(this, TrashActivity::class.java))
+                R.id.nav_settings -> startActivity(Intent(this, SettingsActivity::class.java))
+            }
+            drawerLayout.closeDrawer(GravityCompat.START)
+            true
+        }
     }
 
     private fun setupListeners() {
@@ -115,35 +152,29 @@ class MainActivity : AppCompatActivity(),
 
         btnTaskMini.setOnClickListener {
             collapseMenu()
-            editingPosition = -1
             startActivityForResult(Intent(this, TaskFormActivity::class.java), REQ_ADD_TASK)
         }
-
         btnNoteMini.setOnClickListener {
             collapseMenu()
-            editingPosition = -1
             startActivityForResult(Intent(this, NoteFormActivity::class.java), REQ_NOTE)
         }
-
         btnEventMini.setOnClickListener {
             collapseMenu()
-            editingPosition = -1
             startActivityForResult(Intent(this, EventFormActivity::class.java), REQ_EVENT)
         }
     }
 
-    // --- PLACEHOLDER LOGIC ---
     private fun updatePlaceholderVisibility() {
         val isEmpty = when {
-            rvTasksTab.visibility == View.VISIBLE -> taskTabAdapter.itemCount == 0
-            rvNotesTab.visibility == View.VISIBLE -> notesAdapter.itemCount == 0
-            rvEventsTab.visibility == View.VISIBLE -> eventAdapter.itemCount == 0
-            else -> todayAdapter.itemCount == 0
+            rvTasksTab.visibility == View.VISIBLE -> SharedData.activeTasks.isEmpty()
+            rvNotesTab.visibility == View.VISIBLE -> SharedData.activeNotes.isEmpty()
+            rvEventsTab.visibility == View.VISIBLE -> SharedData.activeEvents.isEmpty()
+            else -> SharedData.activeTasks.isEmpty()
         }
         txtEmptyPlaceholder.visibility = if (isEmpty) View.VISIBLE else View.GONE
     }
 
-    // --- INTERFACE CLICKS ---
+    // --- RECYCLERVIEW ACTIONS (Updated to use SharedData) ---
     override fun onTaskClick(task: Task, position: Int) {
         editingPosition = position
         val intent = Intent(this, TaskFormActivity::class.java).apply { putExtra("taskData", task) }
@@ -151,10 +182,14 @@ class MainActivity : AppCompatActivity(),
     }
 
     override fun onTaskLongClick(task: Task, position: Int) {
-        AlertDialog.Builder(this).setTitle("Delete Task?").setPositiveButton("Yes") { _, _ ->
-            taskTabAdapter.removeTask(position)
-            updatePlaceholderVisibility()
-        }.show()
+        AlertDialog.Builder(this)
+            .setTitle("Delete Task?")
+            .setPositiveButton("Yes") { _, _ ->
+                SharedData.activeTasks.remove(task)
+                SharedData.deletedTasks.add(task)
+                refreshAllData()
+                Toast.makeText(this, "Moved to Trash 🗑️", Toast.LENGTH_SHORT).show()
+            }.show()
     }
 
     override fun onNoteClick(note: Note, position: Int) {
@@ -164,10 +199,13 @@ class MainActivity : AppCompatActivity(),
     }
 
     override fun onNoteLongClick(note: Note, position: Int) {
-        AlertDialog.Builder(this).setTitle("Delete Note?").setPositiveButton("Yes") { _, _ ->
-            notesAdapter.removeNote(position)
-            updatePlaceholderVisibility()
-        }.show()
+        AlertDialog.Builder(this)
+            .setTitle("Delete Note?")
+            .setPositiveButton("Yes") { _, _ ->
+                SharedData.activeNotes.remove(note)
+                SharedData.deletedNotes.add(note)
+                refreshAllData()
+            }.show()
     }
 
     override fun onEventClick(event: Event, position: Int) {
@@ -177,69 +215,57 @@ class MainActivity : AppCompatActivity(),
     }
 
     override fun onEventLongClick(event: Event, position: Int) {
-        AlertDialog.Builder(this).setTitle("Delete Event?").setPositiveButton("Yes") { _, _ ->
-            eventAdapter.removeEvent(position)
-            updatePlaceholderVisibility()
-        }.show()
+        AlertDialog.Builder(this)
+            .setTitle("Delete Event?")
+            .setPositiveButton("Yes") { _, _ ->
+                SharedData.activeEvents.remove(event)
+                SharedData.deletedEvents.add(event)
+                refreshAllData()
+            }.show()
     }
 
-    // --- NAVIGATION LOGIC ---
     private fun showTab(viewToShow: RecyclerView) {
         rvMainToday.visibility = View.GONE
         rvTasksTab.visibility = View.GONE
         rvNotesTab.visibility = View.GONE
         rvEventsTab.visibility = View.GONE
         viewToShow.visibility = View.VISIBLE
-        updatePlaceholderVisibility() // Refresh placeholder when switching tabs
+        updatePlaceholderVisibility()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-
-        if (resultCode != Activity.RESULT_OK) {
-            editingPosition = -1
-            return
-        }
+        if (resultCode != Activity.RESULT_OK) return
 
         when (requestCode) {
             REQ_ADD_TASK, REQ_EDIT_TASK -> {
                 val task = data?.getSerializableExtra("taskData") as? Task
                 task?.let {
-                    if (requestCode == REQ_ADD_TASK) {
-                        taskTabAdapter.addTask(it)
-                    } else {
-                        if (editingPosition != -1) taskTabAdapter.updateTask(it, editingPosition)
-                    }
+                    if (requestCode == REQ_ADD_TASK) SharedData.activeTasks.add(it)
+
+                    else if (editingPosition != -1) SharedData.activeTasks[editingPosition] = it
+                    NotificationHelper.sendNotification(this, "New Task Slayed! ✨", "Added: ${it.title}")
                     showTab(rvTasksTab)
                 }
             }
-
             REQ_NOTE -> {
                 val note = data?.getSerializableExtra("noteData") as? Note
                 note?.let {
-                    if (editingPosition != -1) {
-                        notesAdapter.updateNote(it, editingPosition)
-                    } else {
-                        notesAdapter.addNote(it)
-                    }
+                    if (editingPosition != -1) SharedData.activeNotes[editingPosition] = it
+                    else SharedData.activeNotes.add(it)
                     showTab(rvNotesTab)
                 }
             }
-
             REQ_EVENT -> {
                 val event = data?.getSerializableExtra("eventData") as? Event
                 event?.let {
-                    if (editingPosition != -1) {
-                        eventAdapter.updateEvent(it, editingPosition)
-                    } else {
-                        eventAdapter.addEvent(it)
-                    }
+                    if (editingPosition != -1) SharedData.activeEvents[editingPosition] = it
+                    else SharedData.activeEvents.add(it)
                     showTab(rvEventsTab)
                 }
             }
         }
-        editingPosition = -1
-        updatePlaceholderVisibility() // Refresh after adding/editing
+        refreshAllData()
     }
 
     private fun expandMenu() {
@@ -268,5 +294,18 @@ class MainActivity : AppCompatActivity(),
                 .setInterpolator(AccelerateDecelerateInterpolator())
                 .withEndAction { wrapper.visibility = View.INVISIBLE }.start()
         }
+    }
+
+    private fun checkNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 101)
+            }
+        }
+    }
+
+    override fun onBackPressed() {
+        if (drawerLayout.isDrawerOpen(GravityCompat.START)) drawerLayout.closeDrawer(GravityCompat.START)
+        else super.onBackPressed()
     }
 }

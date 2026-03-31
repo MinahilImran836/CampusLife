@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#FFFFE8"
+    android:padding="16dp">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Trash Bin"
+            android:textSize="26sp"
+            android:fontFamily="@font/cute_apricot"
+            android:textColor="#AACB73" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnClearTrash"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_alignParentEnd="true"
+            android:text="Clear All"
+            android:textAllCaps="false"
+            android:fontFamily="@font/cute_apricot"
+            android:textSize="16sp"
+            android:background="@drawable/btn_save_style"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:textColor="#000000" />
+    </RelativeLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvTrash"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="100dp" />
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/btnRestoreSelected"
+        android:layout_width="220dp"
+        android:layout_height="60dp"
+        android:layout_gravity="center"
+        android:layout_marginTop="-80dp"
+        android:layout_marginBottom="20dp"
+        android:text="Restore Selected"
+        android:textAllCaps="false"
+        android:fontFamily="@font/cute_apricot"
+        android:textSize="18sp"
+        android:background="@drawable/btn_save_style"
+        android:textColor="#000000"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/txtEmptyTrash"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:text="Your trash is empty!"
+        android:fontFamily="@font/cute_apricot"
+        android:textSize="22sp"
+        android:textColor="#AACB73"
+        android:visibility="gone" />
+
+</LinearLayout>

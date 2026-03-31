@@ -78,7 +78,6 @@ class NoteFormActivity : AppCompatActivity() {
     private fun refreshPreviews() {
         containerFiles.removeAllViews()
         selectedUris.forEachIndexed { index, _ ->
-            // Green for Files 🟢
             addPillToContainer(containerFiles, "📎 ${selectedNames[index]}", "#CDE990") {
                 selectedUris.removeAt(index)
                 selectedNames.removeAt(index)
@@ -88,7 +87,6 @@ class NoteFormActivity : AppCompatActivity() {
 
         containerLinks.removeAllViews()
         enteredLinks.forEachIndexed { index, link ->
-            // Pink for Links 🌸
             addPillToContainer(containerLinks, "🔗 $link", "#FFD4D4") {
                 enteredLinks.removeAt(index)
                 refreshPreviews()

@@ -26,8 +26,8 @@ class TaskFormActivity : AppCompatActivity() {
     private lateinit var btnSave: Button
 
     private var calendar = Calendar.getInstance()
-    private val categories = arrayListOf("Study 📚", "Work 💼", "Personal ✨", "Fitness 🍎", "+ Add New")
-    private var selectedCategory = "Study 📚"
+    private val categories = arrayListOf("Study", "Work", "Personal", "Fitness", "+ Add New")
+    private var selectedCategory = "Study"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
