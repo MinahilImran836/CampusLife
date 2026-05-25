@@ -6,9 +6,9 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import com.example.campuslife.model.Task
-import com.example.campuslife.model.Note
-import com.example.campuslife.model.Event
+import com.example.campuslife.data.Task
+import com.example.campuslife.data.Note
+import com.example.campuslife.data.Event
 
 class TrashAdapter(
     private val items: List<Any>,
@@ -33,15 +33,14 @@ class TrashAdapter(
         val item = items[position]
 
         when (item) {
-            is Task -> { holder.title.text = "📌 [TASK] ${item.title}"; holder.subtitle.text = item.date }
-            is Note -> { holder.title.text = "📝 [NOTE] ${item.title}"; holder.subtitle.text = item.content }
-            is Event -> { holder.title.text = "📅 [EVENT] ${item.title}"; holder.subtitle.text = "${item.date} ${item.time}" }
+            is Task -> { holder.title.text = "[TASK] ${item.title}"; holder.subtitle.text = item.date }
+            is Note -> { holder.title.text = "[NOTE] ${item.title}"; holder.subtitle.text = item.content }
+            is Event -> { holder.title.text = "[EVENT] ${item.title}"; holder.subtitle.text = "${item.date} ${item.time}" }
         }
 
-        // 2. Visual Feedback for selection
         holder.root.setBackgroundColor(if (selectedItems.contains(item)) Color.parseColor("#FFD4D4") else Color.TRANSPARENT)
 
-        // 3. Click Logic
+
         holder.root.setOnLongClickListener {
             isSelectionMode = true
             toggleSelection(item)

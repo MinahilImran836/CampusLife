@@ -1,3 +1,4 @@
+﻿# Existing rules
 *.iml
 .gradle
 /local.properties
@@ -13,3 +14,10 @@
 .externalNativeBuild
 .cxx
 local.properties
+CampusLife_backend/env/
+venv/
+env/
+.env/
+CampusLife_backend/__pycache__/
+*.pyc
+CampusLife_backend/pip install upgrade pip.txt

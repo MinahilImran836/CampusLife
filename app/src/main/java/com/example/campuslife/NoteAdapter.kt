@@ -14,12 +14,14 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.recyclerview.widget.RecyclerView
 import com.example.campuslife.R
-import com.example.campuslife.model.Note
+import com.example.campuslife.data.Note
 
 class NoteAdapter(
-    private val notes: MutableList<Note>,
+    private var notes: MutableList<Note>,
     private val listener: OnNoteClickListener
 ) : RecyclerView.Adapter<NoteAdapter.NoteViewHolder>() {
+
+    private var recyclerView: RecyclerView? = null
 
     interface OnNoteClickListener {
         fun onNoteClick(note: Note, position: Int)
@@ -34,6 +36,11 @@ class NoteAdapter(
         val layoutLink: LinearLayout = itemView.findViewById(R.id.layoutCardLink)
     }
 
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        this.recyclerView = recyclerView
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NoteViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_note, parent, false)
         return NoteViewHolder(view)
@@ -44,21 +51,28 @@ class NoteAdapter(
     override fun onBindViewHolder(holder: NoteViewHolder, position: Int) {
         val note = notes[position]
         val context = holder.itemView.context
+        holder.itemView.alpha = 1.0f
+        holder.itemView.translationX = 0f
 
         holder.txtTitle.text = note.title
-        holder.txtContent.text = note.content
+
+        val fullContent = note.content
+        if (fullContent.contains("[Extracted Attachment Data]:")) {
+            holder.txtContent.text = fullContent.substringBefore("[Extracted Attachment Data]:").trim()
+        } else {
+            holder.txtContent.text = fullContent
+        }
+
         holder.txtDate.text = note.date
 
         holder.layoutAttachment.removeAllViews()
         holder.layoutLink.removeAllViews()
-
 
         if (note.attachmentUris.isNotEmpty()) {
             holder.layoutAttachment.visibility = View.VISIBLE
             note.attachmentUris.forEachIndexed { index, uriString ->
                 val fileName = note.attachmentNames.getOrNull(index) ?: "File"
                 val filePill = createMiniPill(context, "📎 $fileName", "#CDE990")
-
                 filePill.setOnClickListener { openFile(context, uriString) }
                 holder.layoutAttachment.addView(filePill)
             }
@@ -66,12 +80,10 @@ class NoteAdapter(
             holder.layoutAttachment.visibility = View.GONE
         }
 
-
         if (note.links.isNotEmpty()) {
             holder.layoutLink.visibility = View.VISIBLE
             note.links.forEach { linkUrl ->
                 val linkPill = createMiniPill(context, "🔗 $linkUrl", "#FFD4D4")
-
                 linkPill.setOnClickListener { openWebLink(context, linkUrl) }
                 holder.layoutLink.addView(linkPill)
             }
@@ -113,7 +125,7 @@ class NoteAdapter(
             }
             context.startActivity(intent)
         } catch (e: Exception) {
-            Toast.makeText(context, "Cannot open file ❌", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Cannot open file", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -126,11 +138,7 @@ class NoteAdapter(
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(finalUrl))
             context.startActivity(intent)
         } catch (e: Exception) {
-            Toast.makeText(context, "Invalid Link ❌", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Invalid Link", Toast.LENGTH_SHORT).show()
         }
     }
-
-    fun addNote(note: Note) { notes.add(0, note); notifyItemInserted(0) }
-    fun updateNote(note: Note, position: Int) { notes[position] = note; notifyItemChanged(position) }
-    fun removeNote(position: Int) { notes.removeAt(position); notifyItemRemoved(position) }
 }

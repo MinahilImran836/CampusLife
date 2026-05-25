@@ -26,7 +26,7 @@
             app:layout_constraintBottom_toBottomOf="@id/tabContainer"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="@id/tabContainer"
-            app:tint="@null" /> ```
+            app:tint="@null" />
 
         <LinearLayout
             android:id="@+id/tabContainer"
@@ -46,6 +46,61 @@
             <Button android:id="@+id/tabEvents" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/tab_pill" android:text="Events" android:textColor="#000000" />
         </LinearLayout>
 
+        <LinearLayout
+            android:id="@+id/searchContainer"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:visibility="gone"
+            app:layout_constraintTop_toBottomOf="@id/tabContainer"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent">
+
+            <EditText
+                android:id="@+id/edtRagSearch"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_weight="1"
+                android:background="@drawable/edit_text_pill"
+                android:backgroundTint="#FFFFFF"
+                android:hint="✨ Query Fetch AI Local Notes RAG..."
+                android:paddingStart="20dp"
+                android:paddingEnd="16dp"
+                android:textSize="14sp"
+                android:textColor="#333333"
+                android:maxLines="1"
+                android:inputType="text"
+                android:imeOptions="actionSearch" />
+        </LinearLayout>
+
+        <HorizontalScrollView
+            android:id="@+id/categoryScrollView"
+            android:layout_width="0dp"
+            android:layout_height="50dp"
+            android:layout_marginTop="8dp"
+            android:scrollbars="none"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/searchContainer">
+
+            <LinearLayout
+                android:id="@+id/categoryPillsLayout"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recyclerViewMain"
             android:layout_width="0dp"
@@ -53,7 +108,7 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tabContainer" />
+            app:layout_constraintTop_toBottomOf="@id/categoryScrollView" />
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recyclerViewTasksTab"
@@ -63,7 +118,7 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tabContainer" />
+            app:layout_constraintTop_toBottomOf="@id/categoryScrollView" />
 
         <TextView
             android:id="@+id/txtEmptyPlaceholder"
@@ -77,7 +132,7 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tabContainer" />
+            app:layout_constraintTop_toBottomOf="@id/categoryScrollView" />
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recyclerViewNotesTab"
@@ -87,7 +142,7 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tabContainer" />
+            app:layout_constraintTop_toBottomOf="@id/categoryScrollView" />
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recyclerViewEventsTab"
@@ -97,7 +152,7 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tabContainer" />
+            app:layout_constraintTop_toBottomOf="@id/categoryScrollView" />
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/fabContainer"

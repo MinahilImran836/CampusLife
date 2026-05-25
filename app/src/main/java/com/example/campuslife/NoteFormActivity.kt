@@ -1,18 +1,37 @@
 package com.example.campuslife
 
 import android.app.Activity
+import android.app.ProgressDialog
 import android.content.Intent
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Matrix
+import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Bundle
+import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import com.example.campuslife.model.Note
+import androidx.lifecycle.lifecycleScope
+import com.example.campuslife.data.AppDatabase
+import com.example.campuslife.data.CampusDao
+import com.example.campuslife.data.Note
+import com.example.campuslife.data.NoteChunk
+import com.example.campuslife.network.NotePayload
+import com.example.campuslife.network.RetrofitClient
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -26,15 +45,25 @@ class NoteFormActivity : AppCompatActivity() {
     private lateinit var containerFiles: LinearLayout
     private lateinit var containerLinks: LinearLayout
 
+    private lateinit var campusDao: CampusDao
     private val selectedUris = mutableListOf<String>()
     private val selectedNames = mutableListOf<String>()
     private val enteredLinks = mutableListOf<String>()
+
+    private var currentNoteId: Int = 0
+    private var existingEmbedding: String? = null
 
     private val PICK_FILE_RESULT_CODE = 101
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // This automatically closes the activity when clicking outside the dialog area
+        setFinishOnTouchOutside(true)
+
         setContentView(R.layout.activity_note_form)
+
+        campusDao = AppDatabase.getDatabase(this).campusDao()
 
         etTitle = findViewById(R.id.edtNoteTitle)
         etContent = findViewById(R.id.edtNoteContent)
@@ -46,11 +75,13 @@ class NoteFormActivity : AppCompatActivity() {
 
         val existingNote = intent.getSerializableExtra("noteData") as? Note
         existingNote?.let {
+            currentNoteId = it.id
             etTitle.setText(it.title)
             etContent.setText(it.content)
             selectedUris.addAll(it.attachmentUris)
             selectedNames.addAll(it.attachmentNames)
             enteredLinks.addAll(it.links)
+            existingEmbedding = it.embedding
             refreshPreviews()
             btnSave.text = "Update Note ✨"
         }
@@ -60,6 +91,7 @@ class NoteFormActivity : AppCompatActivity() {
                 val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                     addCategory(Intent.CATEGORY_OPENABLE)
                     type = "*/*"
+                    putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/pdf", "image/*"))
                 }
                 startActivityForResult(intent, PICK_FILE_RESULT_CODE)
             } else {
@@ -72,7 +104,7 @@ class NoteFormActivity : AppCompatActivity() {
             else Toast.makeText(this, "Max 3 links allowed!", Toast.LENGTH_SHORT).show()
         }
 
-        btnSave.setOnClickListener { saveNote() }
+        btnSave.setOnClickListener { processAndSaveNote() }
     }
 
     private fun refreshPreviews() {
@@ -99,7 +131,6 @@ class NoteFormActivity : AppCompatActivity() {
         val textView = view.findViewById<TextView>(R.id.txtPillText)
         textView.text = text
 
-        // This makes the pill pink or green based on the input
         view.backgroundTintList = ColorStateList.valueOf(Color.parseColor(colorHex))
 
         view.findViewById<ImageView>(R.id.btnRemovePill).setOnClickListener { onRemove() }
@@ -110,7 +141,11 @@ class NoteFormActivity : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == PICK_FILE_RESULT_CODE && resultCode == Activity.RESULT_OK) {
             data?.data?.let { uri ->
-                contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                try {
+                    contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 selectedUris.add(uri.toString())
                 selectedNames.add(getFileName(uri))
                 refreshPreviews()
@@ -149,17 +184,165 @@ class NoteFormActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    private fun saveNote() {
+    private fun processAndSaveNote() {
         val title = etTitle.text.toString().trim()
-        if (title.isEmpty()) return
+        val content = etContent.text.toString().trim()
 
-        val note = Note(
-            title, etContent.text.toString(),
-            SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date()),
-            "#FFFAEC", selectedUris, selectedNames, enteredLinks
-        )
+        if (title.isEmpty()) {
+            Toast.makeText(this, "Title cannot be empty!", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-        setResult(Activity.RESULT_OK, Intent().putExtra("noteData", note))
-        finish()
+        val progressDialog = ProgressDialog(this).apply {
+            setMessage("Extracting chunks and processing vector mappings...")
+            setCancelable(false)
+            show()
+        }
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val initialNote = Note(
+                    id = currentNoteId,
+                    title = title,
+                    content = content,
+                    date = SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date()),
+                    color = "#FFFAEC",
+                    attachmentUris = selectedUris,
+                    attachmentNames = selectedNames,
+                    links = enteredLinks,
+                    isDeleted = false,
+                    embedding = null
+                )
+
+                val generatedId = campusDao.insertNote(initialNote).toInt()
+                val targetNoteId = if (currentNoteId == 0) generatedId else currentNoteId
+
+                if (currentNoteId != 0) {
+                    campusDao.deleteChunksByNoteId(currentNoteId)
+                }
+
+                val chunkList = mutableListOf<NoteChunk>()
+
+                if (content.isNotEmpty()) {
+                    try {
+                        val textBlock = "Note: $title\nDescription: $content"
+                        val response = RetrofitClient.apiService.getNoteEmbedding(NotePayload(text = textBlock))
+                        chunkList.add(
+                            NoteChunk(
+                                noteId = targetNoteId,
+                                chunkText = textBlock,
+                                embedding = response.embedding.toString(),
+                                pageNumber = 0
+                            )
+                        )
+                    } catch (e: Exception) {
+                        Log.e("CAMPUS_LIFE_RAG", "Failed description block mapping", e)
+                    }
+                }
+
+                for (uriString in selectedUris) {
+                    val uri = Uri.parse(uriString)
+                    val mimeType = contentResolver.getType(uri)
+
+                    if (mimeType == "application/pdf") {
+                        val parcelFileDescriptor = contentResolver.openFileDescriptor(uri, "r")
+                        if (parcelFileDescriptor != null) {
+                            val pdfRenderer = PdfRenderer(parcelFileDescriptor)
+                            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+
+                            var slidingWindowText = StringBuilder()
+                            var windowStartPage = 1
+
+                            for (i in 0 until pdfRenderer.pageCount) {
+                                val page = pdfRenderer.openPage(i)
+                                val scaleFactor = 2.0f
+                                val bitmap = Bitmap.createBitmap((page.width * scaleFactor).toInt(), (page.height * scaleFactor).toInt(), Bitmap.Config.ARGB_8888)
+                                val matrix = Matrix().apply { setScale(scaleFactor, scaleFactor) }
+                                page.render(bitmap, null, matrix, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+
+                                val image = InputImage.fromBitmap(bitmap, 0)
+                                try {
+                                    val result = recognizer.process(image).await()
+                                    val cleanText = result.text.trim()
+
+                                    if (cleanText.isNotEmpty()) {
+                                        slidingWindowText.append(" [Slide ${i + 1}]: $cleanText\n")
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("CAMPUS_LIFE_RAG", "MLKit failed on page index $i", e)
+                                } finally {
+                                    page.close()
+                                }
+
+                                if ((i + 1) % 3 == 0 || (i + 1) == pdfRenderer.pageCount) {
+                                    val compiledChunkString = slidingWindowText.toString().trim()
+                                    if (compiledChunkString.isNotEmpty()) {
+                                        val finalChunkText = "Document: $title | Pages $windowStartPage-${i + 1}\n$compiledChunkString"
+                                        try {
+                                            val response = RetrofitClient.apiService.getNoteEmbedding(NotePayload(text = finalChunkText))
+                                            chunkList.add(
+                                                NoteChunk(
+                                                    noteId = targetNoteId,
+                                                    chunkText = finalChunkText,
+                                                    embedding = response.embedding.toString(),
+                                                    pageNumber = windowStartPage
+                                                )
+                                            )
+                                        } catch (e: Exception) {
+                                            Log.e("CAMPUS_LIFE_RAG", "Network vector call failed for chunk", e)
+                                        }
+                                    }
+                                    slidingWindowText = StringBuilder()
+                                    windowStartPage = i + 2
+                                }
+                            }
+                            pdfRenderer.close()
+                            parcelFileDescriptor.close()
+                        }
+                    } else {
+                        try {
+                            val image = InputImage.fromFilePath(this@NoteFormActivity, uri)
+                            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+                            val result = recognizer.process(image).await()
+                            val cleanText = result.text.trim()
+                            if (cleanText.isNotEmpty()) {
+                                val formattedText = "Document Image: $title\n$cleanText"
+                                val response = RetrofitClient.apiService.getNoteEmbedding(NotePayload(text = formattedText))
+                                chunkList.add(
+                                    NoteChunk(
+                                        noteId = targetNoteId,
+                                        chunkText = formattedText,
+                                        embedding = response.embedding.toString(),
+                                        pageNumber = 1
+                                    )
+                                )
+                            }
+                        } catch (e: Exception) {
+                            Log.e("CAMPUS_LIFE_RAG", "Image file extraction error", e)
+                        }
+                    }
+                }
+
+                if (chunkList.isNotEmpty()) {
+                    campusDao.insertChunks(chunkList)
+                }
+
+                val noteToReturn = initialNote.copy(id = targetNoteId)
+
+                withContext(Dispatchers.Main) {
+                    progressDialog.dismiss()
+                    val resultIntent = Intent().apply { putExtra("noteData", noteToReturn) }
+                    setResult(Activity.RESULT_OK, resultIntent)
+                    finish()
+                }
+
+            } catch (e: Exception) {
+                Log.e("CAMPUS_LIFE_RAG", "Global save execution failed", e)
+                withContext(Dispatchers.Main) {
+                    progressDialog.dismiss()
+                    Toast.makeText(this@NoteFormActivity, "Error saving structural note properties.", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 }

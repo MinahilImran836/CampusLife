@@ -7,9 +7,11 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
+import android.widget.RelativeLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.example.campuslife.model.Event
+import androidx.cardview.widget.CardView
+import com.example.campuslife.data.Event
 import java.util.*
 
 class EventFormActivity : AppCompatActivity() {
@@ -19,9 +21,17 @@ class EventFormActivity : AppCompatActivity() {
     private lateinit var btnPickDate: EditText
     private lateinit var btnPickTime: EditText
     private lateinit var btnSave: Button
+    private var selectedCalendar = Calendar.getInstance()
+    private var existingEvent: Event? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // THIS IS THE KEY:
+        // This makes the activity close automatically when a touch is detected
+        // outside the bounds of the floating dialog window.
+        setFinishOnTouchOutside(true)
+
         setContentView(R.layout.activity_event_form)
 
         etTitle = findViewById(R.id.edtEventTitle)
@@ -30,28 +40,32 @@ class EventFormActivity : AppCompatActivity() {
         btnPickTime = findViewById(R.id.btnPickTime)
         btnSave = findViewById(R.id.btnSaveEvent)
 
-        val existingEvent = intent.getSerializableExtra("eventData") as? Event
+        existingEvent = intent.getSerializableExtra("eventData") as? Event
         existingEvent?.let {
             etTitle.setText(it.title)
             etLocation.setText(it.location)
             btnPickDate.setText(it.date)
             btnPickTime.setText(it.time)
+            selectedCalendar.timeInMillis = it.timeInMillis
+            btnSave.text = "Update Event"
         }
 
         btnPickDate.setOnClickListener {
-            val c = Calendar.getInstance()
             DatePickerDialog(this, { _, y, m, d ->
-                val date = "$d/${m+1}/$y"
-                btnPickDate.setText(date)
-            }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
+                selectedCalendar.set(Calendar.YEAR, y)
+                selectedCalendar.set(Calendar.MONTH, m)
+                selectedCalendar.set(Calendar.DAY_OF_MONTH, d)
+                btnPickDate.setText("$d/${m+1}/$y")
+            }, selectedCalendar.get(Calendar.YEAR), selectedCalendar.get(Calendar.MONTH), selectedCalendar.get(Calendar.DAY_OF_MONTH)).show()
         }
 
         btnPickTime.setOnClickListener {
-            val c = Calendar.getInstance()
             TimePickerDialog(this, { _, h, m ->
-                val time = String.format("%02d:%02d", h, m)
-                btnPickTime.setText(time)
-            }, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), true).show()
+                selectedCalendar.set(Calendar.HOUR_OF_DAY, h)
+                selectedCalendar.set(Calendar.MINUTE, m)
+                selectedCalendar.set(Calendar.SECOND, 0)
+                btnPickTime.setText(String.format("%02d:%02d", h, m))
+            }, selectedCalendar.get(Calendar.HOUR_OF_DAY), selectedCalendar.get(Calendar.MINUTE), true).show()
         }
 
         btnSave.setOnClickListener {
@@ -65,7 +79,18 @@ class EventFormActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
 
-            val event = Event(title, location, date, time)
+            val event = Event(
+                id = existingEvent?.id ?: 0,
+                title = title,
+                location = location,
+                date = date,
+                time = time,
+                timeInMillis = selectedCalendar.timeInMillis,
+                isCompleted = existingEvent?.isCompleted ?: false,
+                isDeleted = existingEvent?.isDeleted ?: false,
+                isArchived = existingEvent?.isArchived ?: false
+            )
+
             val resultIntent = Intent()
             resultIntent.putExtra("eventData", event)
             setResult(Activity.RESULT_OK, resultIntent)

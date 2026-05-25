@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:id="@+id/nav_summary" android:title="Weekly Summary" android:icon="@android:drawable/ic_menu_today"/>
+    <item android:id="@+id/nav_summary" android:title="Summary" android:icon="@android:drawable/ic_menu_today"/>
     <item android:id="@+id/nav_trash" android:title="Trash Bin" android:icon="@android:drawable/ic_menu_delete"/>
     <item android:id="@+id/nav_settings" android:title="Settings" android:icon="@android:drawable/ic_menu_preferences"/>
+    <item android:id="@+id/nav_chat" android:title="chat" android:icon="@android:drawable/ic_menu_add"/>
 </menu>

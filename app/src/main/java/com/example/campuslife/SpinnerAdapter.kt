@@ -27,7 +27,6 @@ class SpinnerAdapter(context: Context, items: List<String>) :
 
         itemText.text = value
 
-        // Slay styling for the text inside the dropdown
         if (value == "+ Add New") {
             itemText.setTextColor(context.getColor(android.R.color.holo_green_dark))
         } else {

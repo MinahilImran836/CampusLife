@@ -33,7 +33,7 @@
             android:ellipsize="end"
             android:textColor="#666666"
             android:textSize="14sp"
-            android:text="Don't forget the oat milk and some pink ribbons for the desk decor!" />
+            android:text="null" />
 
         <LinearLayout
             android:id="@+id/layoutCardAttachment"
@@ -59,7 +59,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
-                android:text="vlog_script.pdf"
+                android:text="script.pdf"
                 android:textSize="12sp"
                 android:textColor="#333333" />
         </LinearLayout>
