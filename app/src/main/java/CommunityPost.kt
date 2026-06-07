@@ -5,10 +5,11 @@ import com.google.firebase.firestore.Exclude
 
 data class CommunityPost(
     @get:Exclude @set:Exclude var id: String = "",
-    var author: String = "",       // Matches "author" in hashMap
-    var authorUid: String = "",    // Matches "authorUid" in hashMap
+    var author: String = "",
+    var authorUid: String = "",
     val title: String = "",
     val content: String = "",
+    val category: String = "General",
     var timestamp: Timestamp? = null,
     val attachmentData: List<String> = emptyList(),
     val attachmentNames: List<String> = emptyList()

@@ -30,14 +30,15 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.mlkit.vision.common.InputImage
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
-import java.util.*
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.*
 
 class CommunityFeedActivity : AppCompatActivity() {
 
@@ -45,6 +46,10 @@ class CommunityFeedActivity : AppCompatActivity() {
     private lateinit var rvCommunityFeed: RecyclerView
     private lateinit var fabNewPost: FloatingActionButton
     private lateinit var adapter: CommunityAdapter
+    private lateinit var searchView: SearchView
+    private lateinit var categorySpinner: Spinner
+
+    private var allPosts = mutableListOf<CommunityPost>()
 
     private val pendingFileUris = mutableListOf<Uri>()
     private val pendingFileNames = mutableListOf<String>()
@@ -60,8 +65,6 @@ class CommunityFeedActivity : AppCompatActivity() {
                 dialogFileContainer?.let { container ->
                     val preview = LayoutInflater.from(this).inflate(R.layout.view_post_attachment_row, container, false)
                     preview.findViewById<TextView>(R.id.txtRowAttachmentName).text = fileName
-
-                    // Show REMOVE, Hide SAVE for creation flow
                     preview.findViewById<ImageView>(R.id.btnRowRemove).visibility = View.VISIBLE
                     preview.findViewById<Button>(R.id.btnRowDownload).visibility = View.GONE
 
@@ -82,25 +85,57 @@ class CommunityFeedActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_community_feed)
+
         rvCommunityFeed = findViewById(R.id.rvCommunityFeed)
         fabNewPost = findViewById(R.id.fabNewPost)
+        searchView = findViewById(R.id.searchView)
+        categorySpinner = findViewById(R.id.categorySpinner)
+
         rvCommunityFeed.layoutManager = LinearLayoutManager(this)
 
         adapter = CommunityAdapter(
             onDownloadClick = { post, index -> downloadAndVectorize(post, index) },
-            onEditClick = { post -> Toast.makeText(this, "Edit: ${post.title}", Toast.LENGTH_SHORT).show() },
+            onEditClick = { post -> editPost(post) },
             onDeleteClick = { post -> deletePost(post) },
             onSaveToNotesClick = { post -> saveToMyNotes(post) }
         )
         rvCommunityFeed.adapter = adapter
+
+        setupFilters()
         loadFeedFromFirestore()
         fabNewPost.setOnClickListener { showPostCreationFlow() }
+    }
+
+    private fun setupFilters() {
+        searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean = false
+            override fun onQueryTextChange(newText: String?): Boolean {
+                filterPosts(newText, categorySpinner.selectedItem.toString())
+                return true
+            }
+        })
+
+        categorySpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                filterPosts(searchView.query.toString(), categorySpinner.selectedItem.toString())
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+    }
+
+    private fun filterPosts(query: String?, category: String) {
+        val filtered = allPosts.filter { post ->
+            (query.isNullOrEmpty() || post.title.contains(query, true) || post.content.contains(query, true)) &&
+                    (category == "General" || post.category == category)
+        }
+        adapter.submitList(filtered)
     }
 
     private fun showPostCreationFlow() {
         pendingFileUris.clear()
         pendingFileNames.clear()
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_create_post, null)
+        val spinner = view.findViewById<Spinner>(R.id.spinnerCategory)
         dialogFileContainer = view.findViewById(R.id.containerFilePreviews)
         val dialog = AlertDialog.Builder(this).setView(view).create()
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
@@ -110,14 +145,15 @@ class CommunityFeedActivity : AppCompatActivity() {
         view.findViewById<Button>(R.id.btnPublish).setOnClickListener {
             val title = view.findViewById<EditText>(R.id.edtDialogTitle).text.toString()
             val content = view.findViewById<EditText>(R.id.edtDialogContent).text.toString()
+            val category = spinner.selectedItem.toString()
             if (title.isNotEmpty()) {
-                uploadPost(title, content)
+                uploadPost(title, content, category)
                 dialog.dismiss()
             }
         }
     }
 
-    private fun uploadPost(title: String, content: String) {
+    private fun uploadPost(title: String, content: String, category: String) {
         val attachmentData = mutableListOf<String>()
         for (uri in pendingFileUris) {
             contentResolver.openInputStream(uri)?.use { stream ->
@@ -129,6 +165,7 @@ class CommunityFeedActivity : AppCompatActivity() {
         val post = hashMapOf(
             "title" to title,
             "content" to content,
+            "category" to category,
             "author" to (FirebaseAuth.getInstance().currentUser?.email ?: "Anonymous"),
             "authorUid" to (FirebaseAuth.getInstance().currentUser?.uid ?: ""),
             "timestamp" to FieldValue.serverTimestamp(),
@@ -141,8 +178,38 @@ class CommunityFeedActivity : AppCompatActivity() {
             .addOnFailureListener { e -> Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_SHORT).show() }
     }
 
+    private fun editPost(post: CommunityPost) {
+        val view = LayoutInflater.from(this).inflate(R.layout.dialog_create_post, null)
+        val edtTitle = view.findViewById<EditText>(R.id.edtDialogTitle)
+        val edtContent = view.findViewById<EditText>(R.id.edtDialogContent)
+        val btnPublish = view.findViewById<Button>(R.id.btnPublish)
+        edtTitle.setText(post.title)
+        edtContent.setText(post.content)
+        btnPublish.text = "Update Post"
+        val dialog = AlertDialog.Builder(this).setView(view).create()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.show()
+        btnPublish.setOnClickListener {
+            val newTitle = edtTitle.text.toString()
+            val newContent = edtContent.text.toString()
+            db.collection("posts").document(post.id)
+                .update(mapOf("title" to newTitle, "content" to newContent))
+                .addOnSuccessListener {
+                    Toast.makeText(this, "Updated successfully!", Toast.LENGTH_SHORT).show()
+                    dialog.dismiss()
+                }
+        }
+    }
+
     private fun deletePost(post: CommunityPost) {
-        db.collection("posts").document(post.id).delete()
+        AlertDialog.Builder(this)
+            .setTitle("Delete Post")
+            .setMessage("Are you sure?")
+            .setPositiveButton("Delete") { _, _ ->
+                db.collection("posts").document(post.id).delete()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun saveToMyNotes(post: CommunityPost) {
@@ -235,13 +302,10 @@ class CommunityFeedActivity : AppCompatActivity() {
     }
 
     private fun loadFeedFromFirestore() {
-        db.collection("posts")
-            .orderBy("timestamp", Query.Direction.DESCENDING)
+        db.collection("posts").orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { s, _ ->
-                val posts = s?.map { d ->
-                    d.toObject(CommunityPost::class.java).apply { id = d.id }
-                } ?: emptyList()
-                adapter.submitList(posts)
+                allPosts = s?.map { d -> d.toObject(CommunityPost::class.java).apply { id = d.id } }?.toMutableList() ?: mutableListOf()
+                filterPosts(searchView.query.toString(), categorySpinner.selectedItem.toString())
             }
     }
 

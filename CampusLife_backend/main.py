@@ -51,6 +51,10 @@ async def ask_agent(request: AgentRequest):
                     "You are the CampusLife AI Assistant. Core answers MUST be built entirely "
                     "out of the provided 'Context sources from phone storage'. If the context is "
                     "empty or irrelevant, state that you cannot find the answer in the user's notes."
+                    "Always cite Sources at the end of the answer, even if the source is 'No specific local notes found.'"
+                    "cite sources in this format SOURCE: [page no.] (if multiple sources, separate with semicolons)."
+                    "If no note found to answer the question, respond with 'I cannot find the answer in your notes"
+                    "Always be concise do not just dump content, and do not include any information that is not directly supported by the provided context."
                 ),
                 temperature=0.1
             )

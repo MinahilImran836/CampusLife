@@ -47,6 +47,15 @@
             android:textColor="#666666"
             android:layout_marginTop="6dp"/>
 
+        <TextView
+            android:id="@+id/txtCategory"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#AACB73"
+            android:textStyle="bold"
+            android:textSize="12sp"
+            android:layout_marginTop="4dp"/>
+
         <LinearLayout
             android:id="@+id/containerAttachments"
             android:layout_width="match_parent"

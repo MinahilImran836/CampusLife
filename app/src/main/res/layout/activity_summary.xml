@@ -97,7 +97,7 @@
                         android:layout_weight="1"
                         android:orientation="vertical"
                         android:layout_marginStart="12dp">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="✨ Focus Persona" android:textSize="14sp" android:textStyle="bold" android:textColor="#AACB73"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Focus Persona" android:textSize="14sp" android:textStyle="bold" android:textColor="#AACB73"/>
                         <TextView android:id="@+id/txtAiPersona" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Calculating habits..." android:textColor="#444444" android:textSize="12sp"/>
                     </LinearLayout>
                 </LinearLayout>
@@ -131,7 +131,7 @@
                         android:layout_weight="1"
                         android:orientation="vertical"
                         android:layout_marginStart="12dp">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="⏰ Punctuality Matrix" android:textSize="14sp" android:textStyle="bold" android:textColor="#AACB73"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Punctuality Matrix" android:textSize="14sp" android:textStyle="bold" android:textColor="#AACB73"/>
                         <TextView android:id="@+id/txtAiPunctuality" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Checking timeline..." android:textColor="#444444" android:textSize="12sp"/>
                     </LinearLayout>
                 </LinearLayout>
@@ -165,7 +165,7 @@
                         android:layout_weight="1"
                         android:orientation="vertical"
                         android:layout_marginStart="12dp">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="📍 Location Logs" android:textSize="14sp" android:textStyle="bold" android:textColor="#AACB73"/>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Location Logs" android:textSize="14sp" android:textStyle="bold" android:textColor="#AACB73"/>
                         <TextView android:id="@+id/txtAiLocations" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Mapping hubs..." android:textColor="#444444" android:textSize="12sp"/>
                     </LinearLayout>
                 </LinearLayout>
