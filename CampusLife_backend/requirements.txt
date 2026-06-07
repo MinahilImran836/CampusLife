@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+sentence-transformers
+google-genai
+python-dotenv
+# This ensures we don't install extra GUI or extra heavy framework tools

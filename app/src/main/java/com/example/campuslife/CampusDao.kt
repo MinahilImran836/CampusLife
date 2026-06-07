@@ -77,4 +77,14 @@ interface CampusDao {
 
     @Query("DELETE FROM events WHERE isDeleted = 1")
     suspend fun permanentlyDeleteAllEvents()
+
+    @Query("SELECT * FROM daily_summaries ORDER BY date DESC")
+    fun getSummaryHistory(): kotlinx.coroutines.flow.Flow<List<DailySummary>>
+
+    @Query("SELECT * FROM daily_summaries WHERE date = :date LIMIT 1")
+    suspend fun getSummaryByDate(date: String): DailySummary?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDailySummary(summary: DailySummary)
+
 }

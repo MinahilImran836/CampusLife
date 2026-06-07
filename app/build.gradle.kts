@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     id("org.jetbrains.kotlin.plugin.serialization")
+    alias(libs.plugins.google.gms.google.services)
 }
 
 android {
@@ -34,6 +35,7 @@ android {
     }
     kotlinOptions {
         jvmTarget = "11"
+        freeCompilerArgs = freeCompilerArgs + listOf("-Xskip-metadata-version-check")
     }
     buildFeatures {
         compose = true
@@ -61,6 +63,7 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.play.services.mlkit.text.recognition)
+    implementation(libs.firebase.auth)
     ksp(libs.androidx.room.compiler)
 
     // Specialized Libraries for Campus Life
@@ -73,6 +76,16 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
     implementation("com.android.volley:volley:1.2.1")
+    implementation("com.google.firebase:firebase-firestore:26.3.0")
+    implementation("com.google.firebase:firebase-storage:22.0.1")
+
+    // FirebaseUI architecture with explicit dependency exclusions
+    implementation("com.firebaseui:firebase-ui-firestore:8.0.2") {
+        exclude(group = "com.google.firebase", module = "firebase-common")
+        exclude(group = "com.google.firebase", module = "firebase-firestore")
+        exclude(group = "com.google.firebase", module = "firebase-auth")
+        exclude(group = "com.google.firebase", module = "firebase-bom")
+    }
 
     // Testing
     testImplementation(libs.junit)

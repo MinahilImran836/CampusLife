@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "349025338594",
+    "project_id": "campuslife-ffda8",
+    "storage_bucket": "campuslife-ffda8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:349025338594:android:d2447a279cfda33be34abb",
+        "android_client_info": {
+          "package_name": "com.example.campuslife"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDloTe5RDZBhcbZ7P5x9Iirxw20bG0Kamg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

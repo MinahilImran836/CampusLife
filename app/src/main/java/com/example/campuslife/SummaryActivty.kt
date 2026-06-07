@@ -7,11 +7,13 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.campuslife.data.AppDatabase
-import com.example.campuslife.data.Task
-import com.example.campuslife.data.Event
+import com.example.campuslife.data.DailySummary
 import com.google.ai.client.generativeai.GenerativeModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class SummaryActivity : AppCompatActivity() {
 
@@ -20,72 +22,72 @@ class SummaryActivity : AppCompatActivity() {
         setContentView(R.layout.activity_summary)
 
         val campusDao = AppDatabase.getDatabase(this).campusDao()
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
         lifecycleScope.launch {
             val tasks = campusDao.getAllTasks().first()
             val events = campusDao.getAllEvents().first()
 
-            // --- 1. QUANTITATIVE ENGINE (Local) ---
+            // Calculate stats
             val completed = tasks.filter { it.isCompleted }
+            val onTime = completed.filter { it.completedAt <= it.timeInMillis }
             val percent = if (tasks.isNotEmpty()) (completed.size.toFloat() / tasks.size * 100).toInt() else 0
+            val topCategory = tasks.groupBy { it.category }.maxByOrNull { it.value.size }?.key ?: "N/A"
+            val attendedEvents = events.filter { it.isCompleted }.size
 
+            // UI Update (Static Stats)
             findViewById<ProgressBar>(R.id.summaryChart).progress = percent
             findViewById<TextView>(R.id.txtBigPercentage).text = "$percent%"
             findViewById<TextView>(R.id.txtStatDetails).text = "Tasks Completed: ${completed.size}/${tasks.size}"
-
-            // Populate metric pills immediately
-            findViewById<TextView>(R.id.txtFocusMetric).text = "%.1f".format(tasks.size.toFloat())
+            findViewById<TextView>(R.id.txtFocusMetric).text = "${tasks.size}"
             findViewById<TextView>(R.id.txtPunctualityMetric).text = "$percent%"
-            findViewById<TextView>(R.id.txtLocationMetric).text = "${events.filter { it.isCompleted }.size}"
+            findViewById<TextView>(R.id.txtLocationMetric).text = "$attendedEvents"
 
-            // --- 2. ANALYTICAL ENGINE (AI) ---
-            fetchActualAiSummary(tasks, events)
+            // Logic: Fetch existing or generate new
+            val existingSummary = campusDao.getSummaryByDate(today) // You need this function in DAO
+
+            if (existingSummary != null && !existingSummary.aiSummary.isNullOrEmpty()) {
+                // Use cached AI data
+                parseAndDisplayAi(existingSummary.aiSummary!!)
+            } else {
+                // Generate new AI data and save it
+                val history = campusDao.getSummaryHistory().first()
+                val newSummary = DailySummary(
+                    date = today,
+                    totalTasks = tasks.size,
+                    completedTasks = completed.size,
+                    onTimeTasks = onTime.size,
+                    topCategory = topCategory,
+                    eventsAttended = attendedEvents
+                )
+
+                val aiResponse = generateAiSummary(history)
+                val summaryWithAi = newSummary.copy(aiSummary = aiResponse)
+                campusDao.insertDailySummary(summaryWithAi)
+                parseAndDisplayAi(aiResponse)
+            }
         }
 
         findViewById<Button>(R.id.btnBack).setOnClickListener { finish() }
     }
 
-    private suspend fun fetchActualAiSummary(tasks: List<Task>, events: List<Event>) {
-        val total = tasks.size
-        val done = tasks.count { it.isCompleted }
-        val late = tasks.count { it.isCompleted && it.completedAt > it.timeInMillis }
-        val categories = tasks.groupBy { it.category }.mapValues { it.value.size }
+    private suspend fun generateAiSummary(history: List<DailySummary>): String {
+        val prompt = "Analyze this history: $history. Return 3 blocks with '|||' format: Archetype:::Analysis ||| Bottleneck:::Analysis ||| Strategy:::Advice"
+        val generativeModel = GenerativeModel("gemini-2.5-flash", "")
+        return generativeModel.generateContent(prompt).text ?: "Analysis unavailable."
+    }
 
-        val prompt = """
-            You are a senior productivity coach. 
-            Data: Total Tasks: $total, Completed: $done, Late: $late, Category Distribution: $categories.
-            
-            Perform a professional diagnostic. Return EXACTLY 3 blocks separated by '|||'.
-            Format: [Archetype] ::: [Analysis] ||| [Bottleneck] ::: [Analysis] ||| [Strategy] ::: [Advice]
-            - Archetype: Identify user persona based on late/done ratio.
-            - Bottleneck: Which category is being neglected?
-            - Strategy: One specific data-driven tip to reduce late tasks.
-        """.trimIndent()
-
-        try {
-            val generativeModel = GenerativeModel("gemini-2.5-flash", "YOUR_API_KEY")
-            val response = generativeModel.generateContent(prompt).text ?: ""
-            val blocks = response.split("|||")
-
-            if (blocks.size >= 3) {
-                // Parse and update UI
-                updateUiBlock(R.id.txtAiPersona, blocks[0])
-                updateUiBlock(R.id.txtAiPunctuality, blocks[1])
-                updateUiBlock(R.id.txtAiLocations, blocks[2])
-            }
-        } catch (e: Exception) {
-            findViewById<TextView>(R.id.txtAiPersona).text = "Persona analysis pending."
-            findViewById<TextView>(R.id.txtAiPunctuality).text = "Category bottlenecks calculating."
-            findViewById<TextView>(R.id.txtAiLocations).text = "Strategic forecasting offline."
+    private fun parseAndDisplayAi(response: String) {
+        val blocks = response.split("|||")
+        if (blocks.size >= 3) {
+            updateUiBlock(R.id.txtAiPersona, blocks[0])
+            updateUiBlock(R.id.txtAiPunctuality, blocks[1])
+            updateUiBlock(R.id.txtAiLocations, blocks[2])
         }
     }
 
     private fun updateUiBlock(textViewId: Int, block: String) {
         val parts = block.split(":::")
-        if (parts.size >= 2) {
-            findViewById<TextView>(textViewId).text = parts[1].trim()
-        } else {
-            findViewById<TextView>(textViewId).text = block.trim()
-        }
+        findViewById<TextView>(textViewId).text = if (parts.size >= 2) parts[1].trim() else block.trim()
     }
 }

@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 
 @Database(
-    entities = [Task::class, Event::class, Note::class, NoteChunk::class],
+    entities = [Task::class, Event::class, Note::class, NoteChunk::class, DailySummary::class],
     version = 4,
     exportSchema = false
 )

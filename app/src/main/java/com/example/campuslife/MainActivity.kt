@@ -36,6 +36,7 @@ import kotlin.math.sin
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
@@ -356,12 +357,83 @@ class MainActivity : AppCompatActivity(),
                 R.id.nav_settings -> startActivity(Intent(this, SettingsActivity::class.java))
                 R.id.nav_trash -> startActivity(Intent(this, TrashActivity::class.java))
                 R.id.nav_chat -> startActivity(Intent(this, ChatActivity::class.java))
+                R.id.nav_login -> startActivity(Intent(this, AuthActivity::class.java))
+                R.id.nav_community -> startActivity(Intent(this, CommunityFeedActivity::class.java))
+
+                R.id.nav_logout -> {
+                    com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
+                    Toast.makeText(this, "Logged out safely! See ya! 👋", Toast.LENGTH_SHORT).show()
+                    navigationView.menu.clear()
+                    navigationView.inflateMenu(R.menu.drawer_menu) // Adjust filename if different
+                    navigationView.itemIconTintList = null
+                    updateDrawerMenuVisibility()
+                }
+
+                // ⚠️ NEW: Permanent Account Deletion Engine
+                R.id.nav_delete_account -> {
+                    val currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+
+                    if (currentUser != null) {
+                        AlertDialog.Builder(this)
+                            .setTitle("Delete Your Account?")
+                            .setMessage("This will permanently remove your cloud credentials. Your offline local tasks and notes will remain completely untouched. Proceed?")
+                            .setPositiveButton("Delete Forever") { _, _ ->
+                                currentUser.delete()
+                                    .addOnCompleteListener { task ->
+                                        if (task.isSuccessful) {
+                                            Toast.makeText(this, "Account deleted successfully. Goodbye! 🍃", Toast.LENGTH_SHORT).show()
+
+                                            // Force clear and re-inflate menu to completely refresh layout instantly
+                                            navigationView.menu.clear()
+                                            navigationView.inflateMenu(R.menu.drawer_menu) // Adjust filename if different
+                                            navigationView.itemIconTintList = null
+                                            updateDrawerMenuVisibility()
+                                        } else {
+                                            // Log failure details to Logcat console for quick inspection
+                                            Log.e("CampusLifeAuth", "Account deletion encountered a problem", task.exception)
+                                            Toast.makeText(this, "Failed: ${task.exception?.message}", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                            }
+                            .setNegativeButton("Cancel", null)
+                            .show()
+                    }
+                }
             }
             drawerLayout.closeDrawer(GravityCompat.START)
             true
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        updateDrawerMenuVisibility()
+    }
+
+    // 2. Add this helper function at the bottom of your MainActivity class
+    private fun updateDrawerMenuVisibility() {
+        val menu = navigationView.menu
+        val loginItem = menu.findItem(R.id.nav_login)
+        val communityItem = menu.findItem(R.id.nav_community)
+        val logoutItem = menu.findItem(R.id.nav_logout)
+        val deleteAccountItem = menu.findItem(R.id.nav_delete_account) // ✨ Track delete item pointer
+
+        val currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+
+        if (currentUser != null) {
+            // User is logged in: Hide login, show authenticated features
+            loginItem?.isVisible = false
+            communityItem?.isVisible = true
+            logoutItem?.isVisible = true
+            deleteAccountItem?.isVisible = true // ✨ Show it!
+        } else {
+            // User is a guest: Show login, hide authenticated features
+            loginItem?.isVisible = true
+            communityItem?.isVisible = false
+            logoutItem?.isVisible = false
+            deleteAccountItem?.isVisible = false // ✨ Hide it!
+        }
+    }
     private fun setupListeners() {
         tabTasks.setOnClickListener { showTab(rvTasksTab) }
         tabNotes.setOnClickListener { showTab(rvNotesTab) }

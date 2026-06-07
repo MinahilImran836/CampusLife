@@ -29,7 +29,6 @@ class ChatActivity : AppCompatActivity() {
     private lateinit var rvChat: RecyclerView
     private lateinit var edtInput: EditText
     private lateinit var btnSend: ImageView
-
     private lateinit var campusDao: CampusDao
     private val chatMessages = mutableListOf<ChatMessage>()
     private lateinit var chatAdapter: ChatAdapter
@@ -37,102 +36,66 @@ class ChatActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chat)
-
         campusDao = AppDatabase.getDatabase(this).campusDao()
-
         rvChat = findViewById(R.id.rvChatHistory)
         edtInput = findViewById(R.id.edtChatInput)
         btnSend = findViewById(R.id.btnSendChat)
-
         chatAdapter = ChatAdapter(chatMessages)
-
-        // Use structured initialization parameters for smooth rendering
-        rvChat.layoutManager = LinearLayoutManager(this).apply {
-            stackFromEnd = true
-        }
+        rvChat.layoutManager = LinearLayoutManager(this).apply { stackFromEnd = true }
         rvChat.adapter = chatAdapter
-
-        // CRITICAL FIX: Kill the default item animator to prevent drop-shadow overlapping/flickering
         rvChat.itemAnimator = null
-        rvChat.setHasFixedSize(true)
-
         btnSend.setOnClickListener {
             val userText = edtInput.text.toString().trim()
-            if (userText.isNotEmpty()) {
-                executeChatPipeline(userText)
-            }
+            if (userText.isNotEmpty()) executeChatPipeline(userText)
         }
     }
 
     private fun executeChatPipeline(query: String) {
         appendMessage(ChatMessage(text = query, isUser = true))
         edtInput.text.clear()
-
-        val loadingMessage = ChatMessage(text = "Thinking...", isUser = false)
-        appendMessage(loadingMessage)
+        appendMessage(ChatMessage(text = "Thinking...", isUser = false))
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
+                Log.d("DEBUG_RAG", "Starting pipeline for: $query")
                 val embeddingResponse = RetrofitClient.apiService.getNoteEmbedding(NotePayload(text = query))
                 val queryVector = embeddingResponse.embedding.toFloatArray()
-
                 val allStoredChunks = campusDao.getAllChunksStatic()
+                Log.d("DEBUG_RAG", "Database chunks loaded: ${allStoredChunks.size}")
 
                 var contextualMatches = allStoredChunks.mapNotNull { chunk ->
                     if (chunk.embedding.isEmpty()) return@mapNotNull null
-
                     try {
                         val chunkVector = VectorUtils.parseStringToFloatArray(chunk.embedding)
-                        if (chunkVector.isEmpty()) return@mapNotNull null
-
                         val score = VectorUtils.calculateCosineSimilarity(queryVector, chunkVector)
-                        Pair(chunk, score)
-                    } catch (e: Exception) {
-                        null
-                    }
-                }.filter { it.second >= 0.28f }
-                    .sortedByDescending { it.second }
-                    .take(4)
+                        if (score >= 0.28f) Pair(chunk, score) else null
+                    } catch (e: Exception) { null }
+                }.sortedByDescending { it.second }.take(4)
 
                 if (contextualMatches.isEmpty()) {
-                    val lowerQuery = query.lowercase(Locale.getDefault())
-                    val queryWords = lowerQuery.split("\\s+".toRegex()).filter { it.length > 3 }
-
-                    val fallbackMatches = allStoredChunks.filter { chunk ->
-                        val lowerText = chunk.chunkText.lowercase(Locale.getDefault())
-                        queryWords.any { word -> lowerText.contains(word) }
-                    }.take(3).map { Pair(it, 0.27f) }
-
-                    contextualMatches = fallbackMatches
+                    Log.d("DEBUG_RAG", "No semantic matches found, using fallback.")
+                    contextualMatches = allStoredChunks.take(3).map { Pair(it, 0.0f) }
                 }
 
                 val contextStringBuilder = StringBuilder()
-                if (contextualMatches.isNotEmpty()) {
-                    contextStringBuilder.append("Extracted slide references found in local device database storage:\n\n")
-                    contextualMatches.forEach { (chunk, _) ->
-                        contextStringBuilder.append(chunk.chunkText).append("\n---\n")
-                    }
+                contextualMatches.forEach { (chunk, score) ->
+                    Log.d("DEBUG_RAG", "Adding chunk (score: $score): ${chunk.chunkText.take(50)}...")
+                    contextStringBuilder.append(chunk.chunkText).append("\n---\n")
                 }
 
                 val cleanContextString = contextStringBuilder.toString().trim()
+                Log.d("DEBUG_RAG", "Final context string length: ${cleanContextString.length}")
 
-                val agentRequestPayload = AgentRequest(
-                    query = query,
-                    context = cleanContextString
-                )
-
-                val backendResponse = RetrofitClient.apiService.askAgent(agentRequestPayload)
-
+                val backendResponse = RetrofitClient.apiService.askAgent(AgentRequest(query, cleanContextString))
                 withContext(Dispatchers.Main) {
                     removeLastMessage()
                     appendMessage(ChatMessage(text = backendResponse.answer, isUser = false))
                 }
-
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e("DEBUG_RAG", "Error: ${e.message}")
                 withContext(Dispatchers.Main) {
                     removeLastMessage()
-                    appendMessage(ChatMessage(text = "❌ Error reaching backend server instances.", isUser = false))
+                    appendMessage(ChatMessage(text = "❌ Error: ${e.message}", isUser = false))
                 }
             }
         }
@@ -152,38 +115,13 @@ class ChatActivity : AppCompatActivity() {
         }
     }
 
-    // Custom ViewHolders for structural layout bubble mapping
-    private inner class UserMessageViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val txtMessage: TextView = view.findViewById(R.id.txtUserMessage)
-    }
-
-    private inner class AssistantMessageViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val txtMessage: TextView = view.findViewById(R.id.txtAssistantMessage)
-    }
-
-    private inner class ChatAdapter(val items: List<ChatMessage>) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
-
+    // ViewHolders and Adapter omitted for brevity but remain unchanged from your original file
+    inner class UserMessageViewHolder(view: View) : RecyclerView.ViewHolder(view) { val txtMessage: TextView = view.findViewById(R.id.txtUserMessage) }
+    inner class AssistantMessageViewHolder(view: View) : RecyclerView.ViewHolder(view) { val txtMessage: TextView = view.findViewById(R.id.txtAssistantMessage) }
+    inner class ChatAdapter(val items: List<ChatMessage>) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         override fun getItemViewType(position: Int): Int = if (items[position].isUser) 1 else 0
-
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-            return if (viewType == 1) {
-                val view = LayoutInflater.from(parent.context).inflate(R.layout.item_chat_bubble_user, parent, false)
-                UserMessageViewHolder(view)
-            } else {
-                val view = LayoutInflater.from(parent.context).inflate(R.layout.item_chat_bubble_assistant, parent, false)
-                AssistantMessageViewHolder(view)
-            }
-        }
-
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder = if (viewType == 1) UserMessageViewHolder(LayoutInflater.from(parent.context).inflate(R.layout.item_chat_bubble_user, parent, false)) else AssistantMessageViewHolder(LayoutInflater.from(parent.context).inflate(R.layout.item_chat_bubble_assistant, parent, false))
         override fun getItemCount(): Int = items.size
-
-        override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-            val item = items[position]
-            if (holder is UserMessageViewHolder) {
-                holder.txtMessage.text = item.text
-            } else if (holder is AssistantMessageViewHolder) {
-                holder.txtMessage.text = item.text
-            }
-        }
+        override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) { val item = items[position]; if (holder is UserMessageViewHolder) holder.txtMessage.text = item.text else if (holder is AssistantMessageViewHolder) (holder as AssistantMessageViewHolder).txtMessage.text = item.text }
     }
 }
