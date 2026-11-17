@@ -4,8 +4,8 @@ An Android app that helps university students organise tasks, notes and campus e
 
 
 <p align="center">
-  <img src="Fetch2.jpg" width="45%" />
-  <img src="Fetch3.jpg" width="45%" />
+  <img src= "CampusLife1.jpg" width="45%" />
+  <img src="CampusLife2.jpg" width="45%" />
 </p>
 
 
