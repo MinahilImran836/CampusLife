@@ -1,70 +1,52 @@
-# CampusLife Android Application
+# CampusLife
 
-## Project Overview
-CampusLife is an Android application designed to help university students manage their daily academic tasks, personal notes, and campus events. The application utilizes a local Room database to ensure data persistence and provides a structured way to organize academic responsibilities.
+An Android app that helps university students organise tasks, notes and campus events. It also has an AI study assistant that answers questions from your own notes, and a community feed for sharing material with other students.
 
----
+A prebuilt APK is available at [`apk/CampusLife.apk`](apk/CampusLife.apk).
 
-## Core Features
+## Features
 
-*   **Task Management**: Create, edit, and track academic assignments with priority levels and due dates.
-*   **Note Taking**: Store detailed notes with support for file attachments and external links.
-*   **Event Scheduling**: Organize and view upcoming campus events.
-*   **Data Persistence**: Integrated with SQLite via the Room Persistence Library for offline data access.
-*   **Trash System**: A safety mechanism to recover or permanently delete items.
+- **Authentication**: email/password sign-up and login with Firebase Auth.
+- **Tasks**: create, edit and complete assignments with categories, due dates, times and an importance flag. Tasks finished after their due date are marked as late.
+- **Notes**: rich notes with file/image attachments and web links. Text in attached images is extracted with on-device OCR (ML Kit).
+- **Events**: schedule campus events and track attendance.
+- **AI Chat Assistant (RAG)**: ask questions about your notes. Notes are split into chunks and embedded, the most relevant chunks are found with cosine similarity, and Gemini answers using them as context.
+- **Community Feed**: post, edit and delete shared notes. Includes search, category filters, image uploads and saving a post to your own notes, with OCR and vectorisation so the assistant can use it too.
+- **Daily Summary**: an AI-generated report on your productivity, built from your task and event history.
+- **Reminders and notifications**: a daily reminder plus reminders for specific tasks and events, scheduled with AlarmManager. The reminder time is set in Settings.
+- **Trash**: restore deleted items or delete them permanently.
+- **Onboarding**: interactive feature tour using TapTargetView.
+- **Offline-first**: tasks, notes, events and note embeddings are stored locally with Room.
 
----
+## Tech Stack
 
-## Technical Architecture
+**Android app** (`app/`)
+- Kotlin, XML layouts with Material Components (Jetpack Compose theme included)
+- Room (SQLite) with KSP, Kotlin Coroutines and Flow
+- Firebase Auth, Firestore and Storage, plus FirebaseUI
+- Google ML Kit Text Recognition (OCR)
+- Google Generative AI SDK (Gemini 2.5 Flash) and MediaPipe Text
+- Retrofit with Gson, Volley, kotlinx-serialization
+- Min SDK 24, Target/Compile SDK 35
 
-The project follows the Model-View-Controller (MVC) and Data Access Object (DAO) patterns to maintain a clean separation of concerns.
+**Backend** (`CampusLife_backend/`)
+- Python with FastAPI and Uvicorn
+- `sentence-transformers` (`all-MiniLM-L6-v2`) for text embeddings
+- `google-genai` (Gemini 2.5 Flash) for answering questions
+- Endpoints: `POST /get_embedding/` and `POST /ask/`
 
-*   **Database**: Room Database for local structured storage.
-*   **Asynchronous Operations**: Kotlin Coroutines and Flow for non-blocking database queries.
-*   **UI Components**: RecyclerView for efficient list rendering and Material Design components for the interface.
+## Getting Started
 
----
+### Backend
+```bash
+cd CampusLife_backend
+pip install -r requirements.txt
+echo "GEMINI_API_KEY=your_key" > .env
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
 
-## Data Models
-
-The application manages three primary entities located in the `data` package:
-
-1.  **Task**: Contains title, category, date, time, importance status, and completion state.
-2.  **Note**: Includes title, content, date, and mutable lists for attachment URIs and web links.
-3.  **Event**: Stores event details, timing, and attendance status.
-
----
-
-## Implementation Details
-
-### Room Database Configuration
-The `AppDatabase` class serves as the main access point for the underlying SQLite database. It includes a singleton pattern to prevent multiple instances of the database from opening at the same time.
-
----
-
-## Requirements
-
-*   Android Studio Ladybug or newer.
-*   JDK 17 or higher.
-*   Android API Level 24 (Nougat) or higher.
-
----
-
-## Dependencies
-
-The following key libraries are used in this project:
-
-*   **androidx.room**: Database management.
-*   **kotlinx-coroutines**: Asynchronous programming.
-*   **kotlinx-serialization**: JSON parsing for complex data types.
-*   **com.getkeepsafe.taptargetview**: Interactive user tutorials.
-
----
-
-## Installation
-
-1.  Clone the repository to your local machine.
-2.  Open the project in Android Studio.
-3.  Ensure the KSP plugin is properly configured in your `build.gradle` file.
-4.  Sync the project with Gradle files.
-5.  Build and run the application on an emulator or physical device.
+### Android
+1. Open the project in Android Studio (Ladybug or newer, JDK 17+).
+2. Add your `google-services.json` to `app/`.
+3. In `ApiService.kt`, set `BASE_URL` to your machine's local IP, e.g. `http://192.168.x.x:8000/`.
+4. Sync Gradle and run the app on an emulator or device on the same network as the backend.

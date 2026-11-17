@@ -73,7 +73,7 @@ class SummaryActivity : AppCompatActivity() {
 
     private suspend fun generateAiSummary(history: List<DailySummary>): String {
         val prompt = "Analyze this history: $history. Return 3 blocks with '|||' format: Archetype:::Analysis ||| Bottleneck:::Analysis ||| Strategy:::Advice"
-        val generativeModel = GenerativeModel("gemini-2.5-flash", "")
+        val generativeModel = GenerativeModel("gemini-2.5-flash", BuildConfig.GEMINI_API_KEY)
         return generativeModel.generateContent(prompt).text ?: "Analysis unavailable."
     }
 
