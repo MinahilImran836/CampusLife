@@ -2,6 +2,13 @@
 
 An Android app that helps university students organise tasks, notes and campus events. It also has an AI study assistant that answers questions from your own notes, and a community feed for sharing material with other students.
 
+
+<p align="center">
+  <img src="Fetch2.jpg" width="45%" />
+  <img src="Fetch3.jpg" width="45%" />
+</p>
+
+
 A prebuilt APK is available at [`apk/CampusLife.apk`](apk/CampusLife.apk).
 
 ## Features
